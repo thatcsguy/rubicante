@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rubicante</title>
+<style>
+    canvas {
+		display: block;
+		margin-left: auto;
+		margin-right: auto;
+    }
+	body {
+		background-color:gray;
+	}
+</style>
+</head>
+<body>
+<canvas id="myCanvas" width="1000" height="1000"></canvas>
+
+<script>
+// Get the canvas element
+var canvas = document.getElementById("myCanvas");
+var ctx = canvas.getContext("2d");
+
+// Define the center point of the canvas
+var centerX = canvas.width / 2;
+var centerY = canvas.height / 2;
+
+var smallR = 125;
+
+// Generate
+var arrows = [0,0,0];
+for(var i=0;i<2;i++) {
+	var rand = Math.floor(Math.random()*3);
+	if(Math.random()<.5) {
+		arrows[rand] = -1;
+	} else {
+		arrows[rand] = 1;
+	}
+}
+
+var outer = [];
+for(var i=0;i<8;i++) {
+	outer[i] = Math.random()<.5 ? 'red' : 'blue'
+}
+
+var middle = ['s','s','s','s','s','s','s','s']
+for(var i=0;i<2;i++) {
+	var rand = Math.floor(Math.random()*8);
+	if(Math.random()<.5 && middle[rand] == 's' && middle[(rand+1)%8] == 's') {
+		middle[rand] = 'cw';
+		middle[(rand+1)%8] = 'n';
+	}
+	else if(middle[rand] == 's' && middle[(rand+7)%8] == 's') {
+		middle[rand] = 'ccw';
+		middle[(rand+7)%8] = 'n';
+	} else {
+		i--;
+	}
+}
+
+var inner = ['n','n','n','n','n','n','n','n']
+for(var i=0;i<2;i++) {
+	var rand = Math.floor(Math.random()*8);
+	if (middle[(8+rand+arrows[0]-arrows[1])%8] != 'n') {
+		inner[rand] = 's'
+	} else {
+		i--;
+	}
+}
+
+
+var arrowOffset = 0;
+var tickOffset = 0;
+
+var resolve = false;
+canvas.addEventListener('click', function() {
+	resolve = true;
+}, false);
+
+
+
+// loop through 20fps
+setInterval(draw,50);
+
+function draw() {
+	ctx.clearRect(0,0,1000,1000);
+
+	// Draw first circle
+	ctx.beginPath();
+	ctx.arc(centerX, centerY, 3*smallR, 0, 2 * Math.PI);
+	ctx.fillStyle = 'rgb(155,56,24)';
+	ctx.fill();
+	ctx.closePath();
+
+	// Draw second circle
+	ctx.beginPath();
+	ctx.arc(centerX, centerY, 2*smallR, 0, 2 * Math.PI);
+	ctx.fillStyle = 'rgb(67,30,82)';
+	ctx.fill();
+	ctx.closePath();
+
+	// Draw third circle
+	ctx.beginPath();
+	ctx.arc(centerX, centerY, smallR, 0, 2 * Math.PI);
+	ctx.fillStyle = 'rgb(155,56,24)';
+	ctx.fill();
+	ctx.closePath();
+	
+	var currentOffset = 2*Math.PI/16;
+
+	// Draw outer ticks
+	drawOuterTicks(tickOffset);
+
+	// Draw middle ticks
+	drawMiddleTicks(tickOffset);
+
+	// Draw inner ticks
+	drawInnerTicks(tickOffset);
+	
+	if (resolve) {
+		if (tickOffset < 2*Math.PI/8) {
+			tickOffset += 2*Math.PI/200
+		} else {
+			drawAOEs();
+		}
+	}
+
+	if (!resolve) {
+		drawArrows(arrowOffset);
+		arrowOffset += 2*Math.PI/200
+	}
+}
+
+function drawAOEs() {
+	for(var i=0;i<8;i++) {
+		if(inner[i] != 's') {
+			continue;
+		}
+		
+		var trace = (8+i+arrows[0])%8;
+		if(arrows[1] == 1) {
+			if(middle[(trace+7)%8] == 's') {
+				// nothing
+			} else if(middle[(trace+7)%8] == 'cw') {
+				trace = (trace+1)%8
+			} else if(middle[(trace+7)%8] == 'ccw') {
+				trace = (trace+7)%8
+			}
+		} else if (arrows[1] == -1) {
+			if(middle[(trace+1)%8] == 's') {
+				// nothing
+			} else if(middle[(trace+1)%8] == 'cw') {
+				trace = (trace+1)%8
+			} else if(middle[(trace+1)%8] == 'ccw') {
+				trace = (trace+7)%8
+			}
+		} else {
+			if(middle[trace] == 's') {
+				// nothing
+			} else if(middle[trace] == 'cw') {
+				trace = (trace+1)%8
+			} else if(middle[trace] == 'ccw') {
+				trace = (trace+7)%8
+			}
+		}
+		
+		var shape = '';
+		if(arrows[2] == 1) {
+			shape = outer[(trace+7)%8];
+		} else if (arrows[2] == -1) {
+			shape = outer[(trace+1)%8];
+		} else {
+			shape = outer[trace];
+		}
+		ctx.fillStyle = 'yellow';
+		ctx.beginPath();
+		ctx.arc(centerX + 3.5*smallR*Math.cos(2*trace*Math.PI/8), centerY + 3.5*smallR*Math.sin(2*trace*Math.PI/8), 30, 0, 2*Math.PI)
+		ctx.fill();
+		ctx.closePath();
+		
+		ctx.fillStyle = 'rgba(255,159,36,.5)';
+		
+		// rotate for offset
+		ctx.translate(centerX,centerY);
+		ctx.rotate((trace+2)*2*Math.PI/8);
+		ctx.translate(-centerX,-centerY);
+		if(shape == 'red') {
+			
+			ctx.fillRect(-1000,50,3000,450);
+		} else {
+			ctx.beginPath();
+			ctx.moveTo(500,125);
+			ctx.lineTo(-750,2000);
+			ctx.lineTo(1750,2000);
+			ctx.closePath();
+			ctx.fill();
+		}
+		
+		// undo offset
+		ctx.translate(centerX,centerY);
+		ctx.rotate(-(trace+2)*Math.PI/4);
+		ctx.translate(-centerX,-centerY);
+	}
+}
+
+function drawOuterTicks(offset) {
+	ctx.lineWidth = 10;
+	ctx.strokeStyle = 'rgb(206,254,250)'
+	for(var i=0;i<8;i++) {
+		ctx.beginPath();
+		ctx.moveTo(centerX + 2*smallR*Math.cos(2*i*Math.PI/8 + arrows[2]*offset),centerY + 2*smallR*Math.sin(2*i*Math.PI/8 + arrows[2]*offset));
+		ctx.lineTo(centerX + 3*smallR*Math.cos(2*i*Math.PI/8 + arrows[2]*offset),centerY + 3*smallR*Math.sin(2*i*Math.PI/8 + arrows[2]*offset));
+		ctx.closePath();
+		ctx.stroke();
+	}
+	
+	for(var i=0;i<8;i++) {
+		ctx.fillStyle = outer[i];
+		ctx.beginPath();
+		ctx.arc(centerX + 3.5*smallR*Math.cos(2*i*Math.PI/8 + arrows[2]*offset), centerY + 3.5*smallR*Math.sin(2*i*Math.PI/8 + arrows[2]*offset), 50, 0, 2*Math.PI)
+		ctx.fill();
+		ctx.closePath();
+	}
+}
+
+function drawMiddleTicks(offset) {
+	ctx.lineWidth = 10;
+	ctx.strokeStyle = 'rgb(206,254,250)'
+	for(var i=0;i<8;i++) {
+		if (middle[i] == 's') {
+			ctx.beginPath();
+			ctx.moveTo(centerX + smallR*Math.cos(2*i*Math.PI/8 + arrows[1]*offset),centerY + smallR*Math.sin(2*i*Math.PI/8 + arrows[1]*offset));
+			ctx.lineTo(centerX + 2*smallR*Math.cos(2*i*Math.PI/8 + arrows[1]*offset),centerY + 2*smallR*Math.sin(2*i*Math.PI/8 + arrows[1]*offset));
+			ctx.stroke();
+		}
+		else if (middle[i] == 'cw') {
+			ctx.beginPath();
+			var startAngle = 2*i*Math.PI/8 + arrows[1]*offset;
+			var endAngle = 2*(i+1)*Math.PI/8 + arrows[1]*offset;
+			ctx.moveTo(centerX + smallR*Math.cos(startAngle),centerY + smallR*Math.sin(startAngle));
+			ctx.lineTo(centerX + smallR*1.5*Math.cos(startAngle),centerY + smallR*1.5*Math.sin(startAngle));
+			ctx.arc(centerX, centerY, 1.5*smallR, startAngle, endAngle);
+			ctx.lineTo(centerX + 2*smallR*Math.cos(endAngle),centerY + 2*smallR*Math.sin(endAngle));
+			ctx.stroke();
+		}
+		else if (middle[i] == 'ccw') {
+			ctx.beginPath();
+			var startAngle = 2*i*Math.PI/8 + arrows[1]*offset;
+			var endAngle = 2*(i-1)*Math.PI/8 + arrows[1]*offset;
+			ctx.moveTo(centerX + smallR*Math.cos(startAngle),centerY + smallR*Math.sin(startAngle));
+			ctx.lineTo(centerX + smallR*1.5*Math.cos(startAngle),centerY + smallR*1.5*Math.sin(startAngle));
+			ctx.arc(centerX, centerY, 1.5*smallR, startAngle, endAngle, true);
+			ctx.lineTo(centerX + 2*smallR*Math.cos(endAngle),centerY + 2*smallR*Math.sin(endAngle));
+			ctx.stroke();
+		}
+	}
+}
+
+function drawInnerTicks(offset) {
+	ctx.lineWidth = 10;
+	ctx.strokeStyle = 'rgb(206,254,250)'
+	for(var i=0;i<8;i++) {
+		if (inner[i] == 's') {
+			ctx.beginPath();
+			ctx.moveTo(centerX ,centerY);
+			ctx.lineTo(centerX + smallR*Math.cos(2*i*Math.PI/8 + arrows[0]*offset),centerY + smallR*Math.sin(2*i*Math.PI/8 + arrows[0]*offset));
+			ctx.stroke();
+		}
+	}
+}
+
+function drawArrows(offset) {
+	// Draw arrows
+	ctx.lineWidth = 6;
+	ctx.strokeStyle = 'orange';
+	ctx.lineCap = 'round'
+
+	var numArrows = [4,6,10];
+
+	for(var r=0;r<3;r++) {
+		if(arrows[r] == 0) {
+			continue;
+		}
+		
+		// rotate for offset
+		ctx.translate(centerX,centerY);
+		ctx.rotate(offset*arrows[r]);
+		ctx.translate(-centerX,-centerY);
+		
+		for(var i=0;i<numArrows[r];i++) {
+			ctx.beginPath();
+			ctx.moveTo(centerX + r*smallR + smallR/2, centerY - 20);
+			ctx.lineTo(centerX + r*smallR + smallR/2, centerY + 20);
+			ctx.stroke();
+			
+			if(arrows[r] == 1) { // clockwise
+				ctx.beginPath();
+				ctx.moveTo(centerX + r*smallR + smallR/2, centerY + 20);
+				ctx.lineTo(centerX + r*smallR + smallR/2 - 15, centerY);
+				ctx.stroke();
+				
+				ctx.beginPath();
+				ctx.moveTo(centerX + r*smallR + smallR/2, centerY + 20);
+				ctx.lineTo(centerX + r*smallR + smallR/2 + 15, centerY);
+				ctx.stroke();
+			} else {
+				ctx.beginPath();
+				ctx.moveTo(centerX + r*smallR + smallR/2, centerY - 20);
+				ctx.lineTo(centerX + r*smallR + smallR/2 - 15, centerY);
+				ctx.stroke();
+				
+				ctx.beginPath();
+				ctx.moveTo(centerX + r*smallR + smallR/2, centerY - 20);
+				ctx.lineTo(centerX + r*smallR + smallR/2 + 15, centerY);
+				ctx.stroke();
+			}
+			
+			ctx.translate(centerX,centerY);
+			ctx.rotate(2*Math.PI/numArrows[r]);
+			ctx.translate(-centerX,-centerY);
+		}
+		
+		// undo offset
+		ctx.translate(centerX,centerY);
+		ctx.rotate(-offset*arrows[r]);
+		ctx.translate(-centerX,-centerY);
+	}
+
+
+}
+
+</script>
+</body>
+</html>
