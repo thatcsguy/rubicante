@@ -20,69 +20,116 @@
 
 <script>
 // Get the canvas element
-var canvas = document.getElementById("myCanvas");
-var ctx = canvas.getContext("2d");
+const canvas = document.getElementById("myCanvas");
+const ctx = canvas.getContext("2d");
 
 // Define the center point of the canvas
-var centerX = canvas.width / 2;
-var centerY = canvas.height / 2;
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
 
-var smallR = 125;
+const smallR = 125;
 
-// Generate
-var arrows = [0,0,0];
-for(var i=0;i<2;i++) {
-	var rand = Math.floor(Math.random()*3);
-	if(Math.random()<.5) {
-		arrows[rand] = -1;
-	} else {
-		arrows[rand] = 1;
-	}
-}
+var totalTime = 0;
 
+var startTime = 0;
+var roundTime = 0;
+
+var totalRounds = 0;
+var winRounds = 0;
+
+var arrows = [];
 var outer = [];
-for(var i=0;i<8;i++) {
-	outer[i] = Math.random()<.5 ? 'red' : 'blue'
-}
-
-var middle = ['s','s','s','s','s','s','s','s']
-for(var i=0;i<2;i++) {
-	var rand = Math.floor(Math.random()*8);
-	if(Math.random()<.5 && middle[rand] == 's' && middle[(rand+1)%8] == 's') {
-		middle[rand] = 'cw';
-		middle[(rand+1)%8] = 'n';
-	}
-	else if(middle[rand] == 's' && middle[(rand+7)%8] == 's') {
-		middle[rand] = 'ccw';
-		middle[(rand+7)%8] = 'n';
-	} else {
-		i--;
-	}
-}
-
-var inner = ['n','n','n','n','n','n','n','n']
-for(var i=0;i<2;i++) {
-	var rand = Math.floor(Math.random()*8);
-	if (middle[(8+rand+arrows[0]-arrows[1])%8] != 'n') {
-		inner[rand] = 's'
-	} else {
-		i--;
-	}
-}
-
+var middle = [];
+var inner = [];
 
 var arrowOffset = 0;
 var tickOffset = 0;
 
 var resolve = false;
-canvas.addEventListener('click', function() {
-	resolve = true;
+var done = false;
+var clickX = 0;
+var clickY = 0;
+var dead = false;
+
+generate();
+
+canvas.addEventListener('mousedown', function(e) {
+	if (!resolve) {
+		const rect = canvas.getBoundingClientRect()
+		clickX = e.clientX - rect.left
+		clickY = e.clientY - rect.top
+		resolve = true;
+		roundTime = Date.now() - startTime;
+		totalTime += roundTime;
+	}
 }, false);
 
+
+document.addEventListener('keydown', function(event) {
+    if (event.key.toLowerCase() === 'r' && done) {
+        generate();
+    }
+});
 
 
 // loop through 20fps
 setInterval(draw,50);
+
+
+
+function generate() {
+	// Generate
+	arrows = [0,0,0];
+	for(var i=0;i<2;i++) {
+		var rand = Math.floor(Math.random()*3);
+		if(Math.random()<.5) {
+			arrows[rand] = -1;
+		} else {
+			arrows[rand] = 1;
+		}
+	}
+
+	outer = [];
+	for(var i=0;i<8;i++) {
+		outer[i] = Math.random()<.5 ? 'red' : 'blue'
+	}
+
+	middle = ['s','s','s','s','s','s','s','s']
+	for(var i=0;i<2;i++) {
+		var rand = Math.floor(Math.random()*8);
+		if(Math.random()<.5 && middle[rand] == 's' && middle[(rand+1)%8] == 's') {
+			middle[rand] = 'cw';
+			middle[(rand+1)%8] = 'n';
+		}
+		else if(middle[rand] == 's' && middle[(rand+7)%8] == 's') {
+			middle[rand] = 'ccw';
+			middle[(rand+7)%8] = 'n';
+		} else {
+			i--;
+		}
+	}
+
+	inner = ['n','n','n','n','n','n','n','n']
+	for(var i=0;i<2;i++) {
+		var rand = Math.floor(Math.random()*8);
+		if (middle[(8+rand+arrows[0]-arrows[1])%8] != 'n') {
+			inner[rand] = 's'
+		} else {
+			i--;
+		}
+	}
+	
+	arrowOffset = 0;
+	tickOffset = 0;
+
+	resolve = false;
+	done = false;
+	clickX = 0;
+	clickY = 0;
+	dead = false;
+	
+	startTime = Date.now();
+}
 
 function draw() {
 	ctx.clearRect(0,0,1000,1000);
@@ -120,10 +167,16 @@ function draw() {
 	drawInnerTicks(tickOffset);
 	
 	if (resolve) {
+		drawClick();
 		if (tickOffset < 2*Math.PI/8) {
 			tickOffset += 2*Math.PI/200
 		} else {
 			drawAOEs();
+			if (!done) {
+				totalRounds++;
+				winRounds += dead ? 0 : 1;
+				done = true;
+			}
 		}
 	}
 
@@ -131,6 +184,14 @@ function draw() {
 		drawArrows(arrowOffset);
 		arrowOffset += 2*Math.PI/200
 	}
+}
+
+function drawClick() {
+	ctx.fillStyle = dead ? 'red' : 'limegreen';
+	ctx.beginPath();
+	ctx.arc(clickX, clickY, 20, 0, 2 * Math.PI);
+	ctx.fill();
+	ctx.closePath();
 }
 
 function drawAOEs() {
@@ -174,34 +235,59 @@ function drawAOEs() {
 		} else {
 			shape = outer[trace];
 		}
+		
+		// rotate for offset
+		ctx.translate(centerX,centerY);
+		ctx.rotate(trace*2*Math.PI/8);
+		ctx.translate(-centerX,-centerY);
+		
 		ctx.fillStyle = 'yellow';
 		ctx.beginPath();
-		ctx.arc(centerX + 3.5*smallR*Math.cos(2*trace*Math.PI/8), centerY + 3.5*smallR*Math.sin(2*trace*Math.PI/8), 30, 0, 2*Math.PI)
+		ctx.arc(centerX + 3.5*smallR, centerY, 30, 0, 2*Math.PI)
 		ctx.fill();
 		ctx.closePath();
 		
 		ctx.fillStyle = 'rgba(255,159,36,.5)';
 		
-		// rotate for offset
-		ctx.translate(centerX,centerY);
-		ctx.rotate((trace+2)*2*Math.PI/8);
-		ctx.translate(-centerX,-centerY);
 		if(shape == 'red') {
+			ctx.fillRect(500,-1000,450,3000);
 			
-			ctx.fillRect(-1000,50,3000,450);
+			var translatedClick = rotatePoint(clickX, clickY,-trace*2*Math.PI/8);
+			if(translatedClick.x > 500) {
+				dead = true;
+			}			
 		} else {
 			ctx.beginPath();
-			ctx.moveTo(500,125);
-			ctx.lineTo(-750,2000);
-			ctx.lineTo(1750,2000);
+			ctx.moveTo(875,500);
+			ctx.lineTo(-1000,-750);
+			ctx.lineTo(-1000,1750);
 			ctx.closePath();
 			ctx.fill();
+			
+			var translatedClick = rotatePoint(clickX, clickY,-trace*2*Math.PI/8);
+			if(pointInTriangle(translatedClick.x,translatedClick.y,875,500,-1000,-750,-1000,1750)) {
+				dead = true;
+			}
+		}
+		
+		if(Math.sqrt(Math.pow(clickY-centerY,2) + Math.pow(clickX-centerX,2)) > 3*smallR) {
+			dead = true;
 		}
 		
 		// undo offset
 		ctx.translate(centerX,centerY);
-		ctx.rotate(-(trace+2)*Math.PI/4);
+		ctx.rotate(-trace*2*Math.PI/8);
 		ctx.translate(-centerX,-centerY);
+		
+		ctx.font = '48px sans';
+		ctx.fillStyle = 'black';
+		ctx.textBaseline = "middle";
+		ctx.fillText(dead ? "Dead" : "Nice", 20, 50);
+		ctx.fillText("Round: " + roundTime/1000, 20, 100);
+		ctx.fillText("Total: " + totalTime/1000, 20, 150);
+		ctx.fillText("Wins: " + winRounds + "/" + totalRounds, 20, 200);
+		
+		ctx.fillText("Press 'R'", 20, 250);
 	}
 }
 
@@ -327,8 +413,45 @@ function drawArrows(offset) {
 		ctx.rotate(-offset*arrows[r]);
 		ctx.translate(-centerX,-centerY);
 	}
+}
 
+function pointInTriangle(px, py, x1, y1, x2, y2, x3, y3) {
+    // Calculate the area of the triangle formed by the three vertices
+    function triangleArea(x1, y1, x2, y2, x3, y3) {
+        return Math.abs((x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)) / 2);
+    }
+    
+    // Calculate the total area of the triangle
+    var totalArea = triangleArea(x1, y1, x2, y2, x3, y3);
+    
+    // Calculate the areas of three sub-triangles formed by the point and the vertices
+    var area1 = triangleArea(px, py, x1, y1, x2, y2);
+    var area2 = triangleArea(px, py, x2, y2, x3, y3);
+    var area3 = triangleArea(px, py, x3, y3, x1, y1);
+    
+    // If the sum of the areas of the sub-triangles equals the area of the triangle, the point is inside
+    return (totalArea === area1 + area2 + area3);
+}
 
+function rotatePoint(x, y, angle) {
+    // Calculate the sine and cosine of the angle
+    var cosAngle = Math.cos(angle);
+    var sinAngle = Math.sin(angle);
+
+    // Translate the point so that the center becomes the origin
+    var translatedX = x - centerX;
+    var translatedY = y - centerY;
+
+    // Rotate the point around the origin
+    var rotatedX = translatedX * cosAngle - translatedY * sinAngle;
+    var rotatedY = translatedX * sinAngle + translatedY * cosAngle;
+
+    // Translate the rotated point back to its original position
+    var finalX = rotatedX + centerX;
+    var finalY = rotatedY + centerY;
+
+    // Return the rotated point
+    return { x: finalX, y: finalY };
 }
 
 </script>
